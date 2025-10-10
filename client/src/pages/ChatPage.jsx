@@ -21,7 +21,6 @@ const ChatPage = () => {
 
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
   const silenceTimer = useRef();
-
   const welcomeMessage = { role: 'assistant', content: 'Hello! I am Aura, your personal health assistant. How can I help you today?' };
 
   useEffect(() => {
@@ -58,9 +57,7 @@ const ChatPage = () => {
         const historyRes = await axios.get('http://localhost:5001/api/v1/chat');
         if (historyRes.data && historyRes.data.length > 0) {
           setMessages(historyRes.data.map(msg => ({ 
-            role: msg.role, 
-            content: msg.content, 
-            fileName: msg.fileName 
+            role: msg.role, content: msg.content, fileName: msg.fileName 
           })));
         } else {
           setMessages([welcomeMessage]);
@@ -191,7 +188,7 @@ const ChatPage = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', height: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', bgcolor: 'background.default' }}>
       <AppHeader
         appointments={appointments}
         onNotificationClick={() => setIsAppointmentsModalOpen(true)}
@@ -200,9 +197,9 @@ const ChatPage = () => {
         flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',
-        width: '80vw', // occupy 80% of viewport width
-        maxWidth: '1200px',
-        margin: '80px auto 20px auto', // center horizontally
+        width: '100%',
+        maxWidth: '800px',
+        margin: '80px auto 20px auto',
         borderRadius: '10px',
         overflow: 'hidden'
       }}>
