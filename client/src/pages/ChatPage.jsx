@@ -191,12 +191,21 @@ const ChatPage = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', height: '100vh', bgcolor: 'background.default' }}>
       <AppHeader
         appointments={appointments}
         onNotificationClick={() => setIsAppointmentsModalOpen(true)}
       />
-      <Box component={Paper} sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '800px', width: '100%', margin: '80px auto 20px auto', borderRadius: '10px', overflow: 'hidden' }}>
+      <Box component={Paper} sx={{
+        flexGrow: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        width: '80vw', // occupy 80% of viewport width
+        maxWidth: '1200px',
+        margin: '80px auto 20px auto', // center horizontally
+        borderRadius: '10px',
+        overflow: 'hidden'
+      }}>
         <ChatWindow messages={messages} />
         {isLoading && <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}><CircularProgress size={24} /></Box>}
         <ChatInput
