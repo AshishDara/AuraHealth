@@ -1,5 +1,3 @@
-// server/models/Chat.js
-
 const mongoose = require('mongoose');
 
 const chatSchema = new mongoose.Schema({
@@ -11,6 +9,12 @@ const chatSchema = new mongoose.Schema({
   content: {
     type: String,
     required: true,
+  },
+  // *** ADD THIS NEW FIELD ***
+  // It's not required, so normal text messages won't be affected.
+  fileName: {
+    type: String,
+    required: false,
   },
 }, {
   timestamps: true,

@@ -1,5 +1,3 @@
-// client/src/components/ChatWindow.jsx
-
 import React, { useRef, useEffect } from 'react';
 import { Box } from '@mui/material';
 import Message from './Message';
@@ -17,7 +15,12 @@ const ChatWindow = ({ messages }) => {
   return (
     <Box ref={scrollRef} sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
       {messages.map((msg, index) => (
-        <Message key={index} role={msg.role} content={msg.content} />
+        <Message
+          key={index}
+          role={msg.role}
+          content={msg.content}
+          fileName={msg.fileName} // Pass the fileName prop
+        />
       ))}
     </Box>
   );

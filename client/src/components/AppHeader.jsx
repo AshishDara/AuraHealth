@@ -1,18 +1,15 @@
-// client/src/components/AppHeader.jsx
-
 import React from 'react';
 import { AppBar, Toolbar, Typography, IconButton, Badge } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 
-const AppHeader = ({ appointments }) => {
-  // Calculate the number of appointments in the next 2 days
+const AppHeader = ({ appointments, onNotificationClick }) => {
   const getUpcomingAppointmentsCount = () => {
     const now = new Date();
-    const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours
+    const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
     return appointments.filter(app => {
       const appDate = new Date(app.date);
-      return appDate > now && appDate <= twoDaysFromNow;
+      return app.status === 'Confirmed' && appDate > now && appDate <= twoDaysFromNow;
     }).length;
   };
 
@@ -24,7 +21,7 @@ const AppHeader = ({ appointments }) => {
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
           Aura Health
         </Typography>
-        <IconButton color="inherit">
+        <IconButton color="inherit" onClick={onNotificationClick}>
           <Badge badgeContent={upcomingCount} color="error">
             <NotificationsIcon />
           </Badge>

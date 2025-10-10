@@ -21,7 +21,9 @@ app.use(express.json());
 // --- ROUTES ---
 const chatRoutes = require('./routes/chatRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
+app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
 

@@ -1,5 +1,3 @@
-// server/models/Appointment.js
-
 const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema({
@@ -15,11 +13,11 @@ const appointmentSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['Confirmed', 'Cancelled'],
+    enum: ['Confirmed', 'Cancelled', 'Completed'], // 'Completed' is added
     default: 'Confirmed',
   },
 }, {
-  timestamps: true, // Automatically adds createdAt and updatedAt fields
+  timestamps: true,
 });
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
