@@ -1,13 +1,39 @@
-const OpenAI = require('openai');
+const { GoogleGenAI } = require("@google/genai");
 const Appointment = require('../models/Appointment');
 const Chat = require('../models/Chat');
 
-// Initialize OpenAI with your API key from .env
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
-// GET /api/v1/chat - Fetches the entire chat history
+const tools = [
+  {
+    functionDeclarations: [
+      {
+        name: 'book_appointment',
+        description: 'Books a health or medical appointment for the user. Requires a title (reason) and a date.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING', description: 'The title or reason for the appointment, e.g., "Dental Checkup".' },
+            date: { type: 'STRING', description: 'The date and time of the appointment in ISO 8601 format.' },
+          },
+          required: ['title', 'date'],
+        },
+      },
+      {
+        name: 'cancel_appointment',
+        description: 'Deletes or cancels an existing appointment for the user based on its title or date.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING', description: 'The title of the appointment to cancel, e.g., "Dental Checkup".' },
+            date: { type: 'STRING', description: 'The date of the appointment to cancel, in ISO 8601 format.' },
+          },
+        },
+      },
+    ],
+  },
+];
+
 exports.getChatHistory = async (req, res) => {
   try {
     const history = await Chat.find({}).sort({ createdAt: 'asc' });
@@ -17,71 +43,50 @@ exports.getChatHistory = async (req, res) => {
   }
 };
 
-// POST /api/v1/chat - Handles new chat messages
 exports.handleChat = async (req, res) => {
   const { messages } = req.body;
   const userMessage = messages[messages.length - 1];
-  await Chat.create({ role: 'user', content: userMessage.content });
+  
+  await Chat.create({ 
+    role: 'user', 
+    content: userMessage.content,
+    fileName: userMessage.fileName || null,
+  });
 
-  const systemPrompt = `
-    You are "Aura", a personal AI health assistant.
-    - Your goal is to be helpful and empathetic, but you must clarify you are an AI and not a medical professional.
-    - Do not provide medical advice.
-    - You can book and cancel appointments.
-    - When a user asks to book an appointment, use the 'book_appointment' function.
-    - When a user asks to cancel an appointment, use the 'cancel_appointment' function.
-    - Infer the current date to be ${new Date().toISOString()}.
-  `;
+  // --- IMPROVEMENT 1: More forceful instructions for the AI ---
+  const systemPrompt = `You are "Aura", a personal AI health assistant.
+    - Your primary function is to use tools. You MUST use the tools provided when the user's intent matches.
+    - If a user mentions booking, creating, or setting an appointment and provides a reason and a date, you MUST call the 'book_appointment' tool immediately. DO NOT ask for confirmation.
+    - If a user mentions deleting or canceling an appointment, you MUST call the 'cancel_appointment' tool.
+    - The current date is ${new Date().toISOString()}. Use this to calculate all future dates. The current year is ${new Date().getFullYear()}.
+    - Do not provide medical advice.`;
+
+  const history = messages.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }],
+  }));
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      tools: [
-        {
-          type: 'function',
-          function: {
-            name: 'book_appointment',
-            description: 'Books a health or medical appointment for the user.',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'The title or reason for the appointment, e.g., "Dental Checkup".' },
-                date: { type: 'string', description: 'The date and time of the appointment in ISO 8601 format.' },
-              },
-              required: ['title', 'date'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'cancel_appointment',
-            description: 'Cancels an existing appointment for the user based on its title or date.',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'The title of the appointment to cancel, e.g., "Dental Checkup".' },
-                date: { type: 'string', description: 'The date of the appointment to cancel, in ISO 8601 format.' },
-              },
-            },
-          },
-        },
-      ],
-      tool_choice: 'auto',
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      systemInstruction: systemPrompt,
+      contents: history,
+      tools: tools,
     });
+    
+    // --- IMPROVEMENT 2: More robust response handling ---
+    const functionCalls = result.functionCalls;
 
-    const responseMessage = response.choices[0].message;
+    if (functionCalls && functionCalls.length > 0) {
+      const call = functionCalls[0];
+      const { name, args } = call;
 
-    if (responseMessage.tool_calls) {
-      const toolCall = responseMessage.tool_calls[0];
-      const functionName = toolCall.function.name;
-      const functionArgs = JSON.parse(toolCall.function.arguments);
+      console.log('AI wants to call a tool:', name, args); // Debugging line
 
-      if (functionName === 'book_appointment') {
+      if (name === 'book_appointment') {
         const newAppointment = await Appointment.create({
-          title: functionArgs.title,
-          date: new Date(functionArgs.date),
+          title: args.title,
+          date: new Date(args.date),
         });
         const confirmationMessage = {
           role: 'assistant',
@@ -91,29 +96,20 @@ exports.handleChat = async (req, res) => {
         return res.json({ response: confirmationMessage });
       }
 
-      if (functionName === 'cancel_appointment') {
-        console.log("AI is trying to cancel with these details:", functionArgs);
-
+      if (name === 'cancel_appointment') {
         const query = {};
-        if (functionArgs.title) {
-          query.title = { $regex: new RegExp(functionArgs.title, "i") };
-        }
-        if (functionArgs.date) {
-            const startOfDay = new Date(functionArgs.date);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(functionArgs.date);
-            endOfDay.setHours(23, 59, 59, 999);
+        if (args.title) { query.title = { $regex: new RegExp(args.title, "i") }; }
+        if (args.date) {
+            const startOfDay = new Date(args.date); startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(args.date); endOfDay.setHours(23, 59, 59, 999);
             query.date = { $gte: startOfDay, $lte: endOfDay };
         }
-
         const deletedAppointment = await Appointment.findOneAndDelete(query);
-
         if (!deletedAppointment) {
-          const notFoundMessage = { role: 'assistant', content: "I couldn't find an active appointment that matches your request. Could you be more specific?" };
+          const notFoundMessage = { role: 'assistant', content: "I couldn't find an active appointment that matches your request." };
           await Chat.create(notFoundMessage);
           return res.json({ response: notFoundMessage });
         }
-
         const confirmationMessage = {
           role: 'assistant',
           content: `OK. I've deleted your "${deletedAppointment.title}" appointment.`,
@@ -122,13 +118,15 @@ exports.handleChat = async (req, res) => {
         return res.json({ response: confirmationMessage });
       }
     }
-
-    // If no function was called, just save and return the text response
-    await Chat.create({ role: 'assistant', content: responseMessage.content });
-    res.json({ response: responseMessage });
+    
+    // If no tool was called, send a regular text response
+    const textResponse = result.text;
+    const assistantResponse = { role: 'assistant', content: textResponse };
+    await Chat.create(assistantResponse);
+    res.json({ response: assistantResponse });
 
   } catch (error) {
-    console.error('Error with OpenAI API:', error);
+    console.error('Error with Gemini API:', error);
     res.status(500).json({ error: 'Failed to get response from AI.' });
   }
 };
