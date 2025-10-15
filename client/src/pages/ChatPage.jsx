@@ -27,18 +27,25 @@ const ChatPage = () => {
     setInputValue(transcript);
   }, [transcript]);
 
+  // This is the hook for silence detection
   useEffect(() => {
     if (!listening) return;
+
     clearTimeout(silenceTimer.current);
+
     silenceTimer.current = setTimeout(() => {
-      if (transcript.trim()) {
+      // We now check if there's either a transcript OR an attached file
+      if (transcript.trim() || attachedFile) {
         SpeechRecognition.stopListening();
         setVoiceStatus('processing');
-        handleSendMessage(transcript, null, { isVoiceInput: true });
+        // --- THE FIX IS HERE ---
+        // We now pass the 'attachedFile' state along with the transcript
+        handleSendMessage(transcript, attachedFile, { isVoiceInput: true });
       }
     }, 2000);
+
     return () => clearTimeout(silenceTimer.current);
-  }, [transcript, listening]);
+  }, [transcript, listening, attachedFile]); // 'attachedFile' is now a dependency
 
   const fetchAppointments = async () => {
     try {
@@ -74,7 +81,7 @@ const ChatPage = () => {
   }, []);
 
   const handleSendMessage = async (messageContent, file, options = { isVoiceInput: false }) => {
-    const userMessageContent = messageContent || (file ? `Analyze: ${file.name}` : '');
+    const userMessageContent = messageContent || (file ? `Analyze this file` : '');
     if (!userMessageContent && !file) {
       if (options.isVoiceInput) setVoiceStatus('idle');
       return;
@@ -95,10 +102,11 @@ const ChatPage = () => {
 
     try {
       let data;
+      // This 'if (file)' condition will now work correctly for voice input
       if (file) {
         const formData = new FormData();
         formData.append('report', file);
-        formData.append('message', messageContent);
+        formData.append('message', messageContent); // Send the voice transcript as the message
         const response = await axios.post('http://localhost:5001/api/v1/reports/analyze', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
