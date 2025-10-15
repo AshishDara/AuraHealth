@@ -47,7 +47,7 @@ const RegisterPage = () => {
       <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 500, textAlign: 'center' }}>
         <HealthAndSafetyIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
         <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }}>
-          Create Your Aura Health Account
+          Create Your Luna Health Account
         </Typography>
         {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
         <Box component="form" onSubmit={handleSubmit} noValidate>

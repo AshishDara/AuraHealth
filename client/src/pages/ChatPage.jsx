@@ -19,13 +19,13 @@ const ChatPage = () => {
   const [voiceStatus, setVoiceStatus] = useState('idle');
   const [isAppointmentsModalOpen, setIsAppointmentsModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [userName, setUserName] = useState(''); // State for user's name
+  const [userName, setUserName] = useState('');
   const navigate = useNavigate();
 
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
   const silenceTimer = useRef();
   const fileInputRef = useRef(null);
-  const welcomeMessage = { role: 'assistant', content: 'Hello! I am Aura, your personal health assistant. How can I help you today?' };
+  const welcomeMessage = { role: 'assistant', content: 'Hello! I am Luna, your personal health assistant. How can I help you today?' };
 
   useEffect(() => {
     if (listening) {
@@ -66,17 +66,20 @@ const ChatPage = () => {
 
       try {
         const historyRes = await api.get('/chat');
-        if (historyRes.data && historyRes.data.length > 0) {
-          setMessages(historyRes.data.map(msg => ({ 
-            role: msg.role, 
-            content: msg.content, 
-            fileName: msg.fileName 
-          })));
-        } else {
-          setMessages([welcomeMessage]);
-        }
+        
+        // --- THIS IS THE FIX for the disappearing welcome message ---
+        // Always start with the welcome message, then add the fetched history.
+        const fetchedMessages = historyRes.data.map(msg => ({ 
+          role: msg.role, 
+          content: msg.content, 
+          fileName: msg.fileName 
+        }));
+
+        setMessages([welcomeMessage, ...fetchedMessages]);
+
       } catch (error) {
         console.error("Failed to fetch chat history:", error);
+        // If fetching fails, still show the welcome message
         setMessages([welcomeMessage]);
       }
       await fetchAppointments();

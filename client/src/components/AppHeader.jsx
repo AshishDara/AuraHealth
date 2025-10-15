@@ -14,7 +14,7 @@ const AppHeader = ({ appointments = [], onNotificationClick, userName, onLogout 
     >
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-          Aura Health
+          Luna Health
         </Typography>
         
         {/* --- THIS IS THE NEW LOGIC --- */}

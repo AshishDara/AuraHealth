@@ -16,6 +16,7 @@ exports.analyzeReport = async (req, res) => {
     const userQuestion = message || `Analyze this health report.`;
 
     await Chat.create({
+      userId: req.user._id,
       role: 'user',
       content: userQuestion,
       fileName: req.file.originalname,
@@ -55,7 +56,7 @@ Step 6: **Mandatory Disclaimer.** End your entire response with: "Remember, this
 
     const text = result.text;
     const aiResponse = { role: 'assistant', content: text };
-    await Chat.create(aiResponse);
+    await Chat.create({ userId: req.user._id, ...aiResponse });
     res.json({ response: aiResponse });
   } catch (error) {
     console.error('Error analyzing report with Gemini:', error);

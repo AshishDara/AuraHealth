@@ -41,7 +41,7 @@ const LoginPage = () => {
           Welcome Back
         </Typography>
         <Typography component="p" color="text.secondary" sx={{ mb: 3 }}>
-          Sign in to continue to Aura Health.
+          Sign in to continue to Luna Health.
         </Typography>
         {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
         <Box component="form" onSubmit={handleSubmit} noValidate>

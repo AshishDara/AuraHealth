@@ -20,13 +20,13 @@ const transporter = nodemailer.createTransport({
  */
 const sendWelcomeEmail = async (user) => {
   // 1. Create a personalized prompt for the AI
-  const prompt = `You are the voice of "Aura Health", a smart AI health companion. Write a short, exciting, and welcoming email to a new user.
+  const prompt = `You are the voice of "Luna Health", a smart AI health companion. Write a short, exciting, and welcoming email to a new user.
     - The user's name is ${user.name}.
     - Their primary health goal is: "${user.healthGoals || 'live a healthier life'}".
     - Make the email feel personal, inspiring, and smart.
-    - Mention their specific health goal and how Aura can help them achieve it.
+  - Mention their specific health goal and how Luna can help them achieve it.
     - Keep it concise (around 3-4 short paragraphs).
-    - Sign off as "Your personal health companion, Aura".
+  - Sign off as "Your personal health companion, Luna".
     - DO NOT include a subject line.`;
 
   try {
@@ -39,12 +39,12 @@ const sendWelcomeEmail = async (user) => {
 
     // 3. Send the email using Nodemailer
     const mailOptions = {
-      from: '"Aura Health" <welcome@aurahealth.com>',
+      from: '"Luna Health" <welcome@lunahealth.com>',
       to: user.email,
-      subject: `Welcome to Aura Health, ${user.name}!`,
+      subject: `Welcome to Luna Health, ${user.name}!`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <h2 style="color: #212121;">Welcome to Aura Health!</h2>
+          <h2 style="color: #212121;">Welcome to Luna Health!</h2>
           ${emailBody.replace(/\n/g, '<br/>')}
         </div>
       `, // Convert newlines to <br> for HTML
@@ -64,7 +64,7 @@ const sendWelcomeEmail = async (user) => {
  */
 const sendAppointmentConfirmationEmail = async (user, appointment) => {
   const mailOptions = {
-    from: '"Aura Health" <no-reply@aurahealth.com>',
+  from: '"Luna Health" <no-reply@lunahealth.com>',
     to: user.email,
     subject: 'Your Appointment has been Confirmed!',
     html: `
@@ -77,7 +77,7 @@ const sendAppointmentConfirmationEmail = async (user, appointment) => {
           <li><strong>Date & Time:</strong> ${new Date(appointment.date).toLocaleString()}</li>
         </ul>
         <p>We look forward to assisting you.</p>
-        <p>Sincerely,<br/>The Aura Health Team</p>
+  <p>Sincerely,<br/>The Luna Health Team</p>
       </div>
     `,
   };
@@ -97,7 +97,7 @@ const sendAppointmentConfirmationEmail = async (user, appointment) => {
  */
 const sendAppointmentCancellationEmail = async (user, appointment) => {
   const mailOptions = {
-    from: '"Aura Health" <no-reply@aurahealth.com>',
+  from: '"Luna Health" <no-reply@lunahealth.com>',
     to: user.email,
     subject: 'Your Appointment has been Canceled',
     html: `
@@ -110,7 +110,7 @@ const sendAppointmentCancellationEmail = async (user, appointment) => {
           <li><strong>Date & Time:</strong> ${new Date(appointment.date).toLocaleString()}</li>
         </ul>
         <p>If this was a mistake, please feel free to book a new appointment at any time.</p>
-        <p>Sincerely,<br/>The Aura Health Team</p>
+  <p>Sincerely,<br/>The Luna Health Team</p>
       </div>
     `,
   };
