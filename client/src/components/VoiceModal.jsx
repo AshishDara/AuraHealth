@@ -37,15 +37,15 @@ const VoiceModal = ({ open, onClose, transcript, status, onMicClick }) => {
           icon: <MicIcon sx={{ fontSize: 50 }} />,
           isPulsing: true,
         };
-      case 'processing':
+        case 'processing':
         return {
-          title: "Aura is thinking...",
+          title: "Luna is thinking...",
           icon: <CircularProgress size={50} color="inherit" />,
           isPulsing: false,
         };
       case 'speaking':
         return {
-          title: "Aura is speaking...",
+          title: "Luna is speaking...",
           icon: <GraphicEqIcon sx={{ fontSize: 50 }} />,
           isPulsing: false,
         };

@@ -3,14 +3,24 @@ import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 
+// --- THE NEW BLACK & WHITE THEME ---
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#00796b',
+      main: '#212121', // A dark, near-black color
+      contrastText: '#ffffff', // White text on primary buttons
     },
     background: {
-      default: '#f4f6f8',
+      default: '#ffffff', // Pure white background
+      paper: '#ffffff',   // White for components like the chat window
     },
+    text: {
+      primary: '#000000',     // Black for primary text
+      secondary: '#757575', // Gray for secondary text
+    },
+  },
+  typography: {
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
 });
 

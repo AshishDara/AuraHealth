@@ -107,7 +107,7 @@ exports.handleChat = async (req, res) => {
       return res.json({ response: confirmationMessage });
 
     } else {
-      const systemPrompt = `You are "Aura", a helpful AI health assistant. Be friendly and conversational. Do not mention appointments unless the user does.`;
+  const systemPrompt = `You are "Luna", a helpful AI health assistant. Be friendly and conversational. Do not mention appointments unless the user does.`;
       const history = messages.map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
       const result = await ai.models.generateContent({ model: "gemini-2.5-flash", systemInstruction: systemPrompt, contents: history });
       const assistantResponse = { role: 'assistant', content: result.text };

@@ -1,87 +1,83 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Box, TextField, IconButton, Chip } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-import MicIcon from '@mui/icons-material/Mic';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import MicIcon from '@mui/icons-material/Mic';
 
-// This component is now fully controlled by its parent (ChatPage)
 const ChatInput = ({ 
+  fileInputRef, // Accept the ref from the parent
   onSendMessage, 
   disabled, 
   onFileSelect, 
   onVoiceClick, 
   value, 
   onValueChange, 
-  selectedFile // We receive the selected file as a prop
+  selectedFile 
 }) => {
-  const fileInputRef = useRef(null);
+  const handleSendClick = () => {
+    onSendMessage(value, selectedFile);
+  };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
     if (file) {
-      onFileSelect(file); // Notify the parent of the new file
+      onFileSelect(file);
     }
   };
 
-  const handleAttachClick = () => {
-    fileInputRef.current.click();
-  };
-
-  const handleRemoveFile = () => {
-    onFileSelect(null); // Notify the parent to clear the file
-    if (fileInputRef.current) {
-      fileInputRef.current.value = null;
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Use the props directly to send the message
-    if (value.trim() || selectedFile) {
-      onSendMessage(value, selectedFile);
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSendClick();
     }
   };
 
   return (
-    <Box>
+    <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0', bgcolor: 'background.paper' }}>
       {selectedFile && (
-        <Box sx={{ p: 1, pl: 2, bgcolor: '#f5f5f5' }}>
-          <Chip
-            label={selectedFile.name}
-            onDelete={handleRemoveFile}
-            color="primary"
-            variant="outlined"
-            disabled={disabled}
-          />
-        </Box>
-      )}
-      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', p: 1, borderTop: '1px solid #ddd', bgcolor: '#f5f5f5' }}>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-          accept="application/pdf"
+        <Chip
+          label={selectedFile.name}
+          onDelete={() => {
+            onFileSelect(null);
+            // Also reset the input value when the chip is deleted
+            if (fileInputRef.current) {
+              fileInputRef.current.value = null;
+            }
+          }}
+          sx={{ mb: 1 }}
         />
-        <IconButton onClick={handleAttachClick} disabled={disabled || !!selectedFile}>
-          <AttachFileIcon />
-        </IconButton>
+      )}
+      {/* --- Reverted UI Layout --- */}
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Type a question or use the microphone..."
+          placeholder="Type a message or upload a report..."
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
+          onKeyPress={handleKeyPress}
           disabled={disabled}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '20px', bgcolor: 'white' } }}
+          multiline
+          maxRows={4}
+          sx={{ mr: 1 }} // Add margin to separate from icons
         />
-        <IconButton color="primary" type="submit" disabled={disabled || (!value.trim() && !selectedFile)}>
-          <SendIcon />
-        </IconButton>
-        <IconButton color="primary" onClick={onVoiceClick} disabled={disabled}>
+        <IconButton onClick={onVoiceClick} disabled={disabled}>
           <MicIcon />
         </IconButton>
+        <IconButton onClick={() => fileInputRef.current.click()} disabled={disabled}>
+          <AttachFileIcon />
+        </IconButton>
+        <IconButton onClick={handleSendClick} disabled={disabled || (!value.trim() && !selectedFile)} color="primary">
+          <SendIcon />
+        </IconButton>
       </Box>
+      <input
+        type="file"
+        ref={fileInputRef} // Connect the ref here
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+        accept=".pdf"
+      />
     </Box>
   );
 };

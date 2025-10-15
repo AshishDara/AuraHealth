@@ -21,31 +21,29 @@ const ChatPage = () => {
 
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
   const silenceTimer = useRef();
+  const fileInputRef = useRef(null);
   const welcomeMessage = { role: 'assistant', content: 'Hello! I am Aura, your personal health assistant. How can I help you today?' };
 
+  // --- THIS IS THE KEY FIX ---
+  // This hook now only syncs the transcript to the input field WHILE you are actively speaking.
   useEffect(() => {
-    setInputValue(transcript);
-  }, [transcript]);
+    if (listening) {
+      setInputValue(transcript);
+    }
+  }, [transcript, listening]); // 'listening' is now a crucial dependency.
 
-  // This is the hook for silence detection
   useEffect(() => {
     if (!listening) return;
-
     clearTimeout(silenceTimer.current);
-
     silenceTimer.current = setTimeout(() => {
-      // We now check if there's either a transcript OR an attached file
       if (transcript.trim() || attachedFile) {
         SpeechRecognition.stopListening();
         setVoiceStatus('processing');
-        // --- THE FIX IS HERE ---
-        // We now pass the 'attachedFile' state along with the transcript
         handleSendMessage(transcript, attachedFile, { isVoiceInput: true });
       }
     }, 2000);
-
     return () => clearTimeout(silenceTimer.current);
-  }, [transcript, listening, attachedFile]); // 'attachedFile' is now a dependency
+  }, [transcript, listening, attachedFile]);
 
   const fetchAppointments = async () => {
     try {
@@ -95,18 +93,22 @@ const ChatPage = () => {
     setMessages(prev => [...prev, userMessage]);
 
     setAttachedFile(null);
-    setInputValue('');
+    setInputValue(''); // This will now work correctly without being overridden
     resetTranscript();
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null;
+    }
+
     setIsLoading(true);
     if (options.isVoiceInput) setVoiceStatus('processing');
 
     try {
       let data;
-      // This 'if (file)' condition will now work correctly for voice input
       if (file) {
         const formData = new FormData();
         formData.append('report', file);
-        formData.append('message', messageContent); // Send the voice transcript as the message
+        formData.append('message', messageContent);
         const response = await axios.post('http://localhost:5001/api/v1/reports/analyze', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -202,6 +204,7 @@ const ChatPage = () => {
         <ChatWindow messages={messages} />
         {isLoading && <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}><CircularProgress size={24} /></Box>}
         <ChatInput
+          fileInputRef={fileInputRef}
           onSendMessage={handleSendMessage}
           disabled={isLoading}
           onFileSelect={setAttachedFile}
