@@ -1,10 +1,12 @@
 const { GoogleGenAI } = require("@google/genai");
 const Appointment = require('../models/Appointment');
 const Chat = require('../models/Chat');
+// --- IMPORT the email functions ---
+const { sendAppointmentConfirmationEmail, sendAppointmentCancellationEmail } = require('../utils/emailUtils');
 
 const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
-// Helper function with robust JSON extraction
+// Helper function to extract structured JSON data from a message
 async function extractAppointmentDetails(userMessage) {
   const prompt = `You are a data extraction specialist. Analyze the user's request and provide a JSON object with two keys: "title" and "date". The current date is ${new Date().toISOString()}.
   - The "title" should be a clean, short summary of the appointment's purpose.
@@ -16,21 +18,13 @@ async function extractAppointmentDetails(userMessage) {
     const result = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
+      generationConfig: { responseMimeType: "application/json" }
     });
     
-    // --- THIS IS THE KEY FIX: Robustly find and extract the JSON object ---
     const rawText = result.text;
-    const jsonMatch = rawText.match(/{[\s\S]*}/); // Find the first occurrence of {...}
-
-    if (!jsonMatch) {
-      console.error("No JSON object found in the AI's response.");
-      return null;
-    }
-
-    return JSON.parse(jsonMatch[0]); // Parse only the extracted JSON part
+    const jsonMatch = rawText.match(/{[\s\S]*}/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]);
 
   } catch (error) {
     console.error("Could not extract appointment details:", error);
@@ -51,7 +45,7 @@ async function findAppointmentTitleToCancel(history) {
 
 exports.getChatHistory = async (req, res) => {
   try {
-    const history = await Chat.find({}).sort({ createdAt: 'asc' });
+    const history = await Chat.find({ userId: req.user._id }).sort({ createdAt: 'asc' });
     res.json(history);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch chat history.' });
@@ -61,7 +55,7 @@ exports.getChatHistory = async (req, res) => {
 exports.handleChat = async (req, res) => {
   const { messages } = req.body;
   const userMessage = messages[messages.length - 1];
-  await Chat.create({ role: 'user', content: userMessage.content, fileName: userMessage.fileName || null });
+  await Chat.create({ userId: req.user._id, role: 'user', content: userMessage.content, fileName: userMessage.fileName || null });
 
   try {
     const lowerCaseMessage = userMessage.content.toLowerCase();
@@ -75,18 +69,22 @@ exports.handleChat = async (req, res) => {
       const titleToCancel = await findAppointmentTitleToCancel(messages);
       if (!titleToCancel) {
         const failedMessage = { role: 'assistant', content: "I'm sorry, I couldn't determine which appointment to cancel from our conversation." };
-        await Chat.create(failedMessage);
+        await Chat.create({ userId: req.user._id, ...failedMessage });
         return res.json({ response: failedMessage });
       }
 
-      const deletedAppointment = await Appointment.findOneAndDelete({ title: { $regex: new RegExp(titleToCancel, "i") } });
+      const deletedAppointment = await Appointment.findOneAndDelete({ userId: req.user._id, title: { $regex: new RegExp(titleToCancel, "i") } });
       if (!deletedAppointment) {
         const notFoundMessage = { role: 'assistant', content: `I couldn't find an appointment titled "${titleToCancel}".` };
-        await Chat.create(notFoundMessage);
+        await Chat.create({ userId: req.user._id, ...notFoundMessage });
         return res.json({ response: notFoundMessage });
       }
+
+      // --- SEND CANCELLATION EMAIL ---
+      await sendAppointmentCancellationEmail(req.user, deletedAppointment);
+
       const confirmationMessage = { role: 'assistant', content: `OK. I've canceled your "${deletedAppointment.title}" appointment.` };
-      await Chat.create(confirmationMessage);
+      await Chat.create({ userId: req.user._id, ...confirmationMessage });
       return res.json({ response: confirmationMessage });
 
     } else if (isBooking) {
@@ -94,24 +92,38 @@ exports.handleChat = async (req, res) => {
       
       if (!details || !details.title || !details.date) {
         const failedMessage = { role: 'assistant', content: "I'm sorry, I couldn't understand the details of the appointment. Could you please provide a clear reason and date?" };
-        await Chat.create(failedMessage);
+        await Chat.create({ userId: req.user._id, ...failedMessage });
         return res.json({ response: failedMessage });
       }
       
       const newAppointment = await Appointment.create({
+        userId: req.user._id,
         title: details.title,
         date: new Date(details.date),
       });
+
+      // --- SEND CONFIRMATION EMAIL ---
+      await sendAppointmentConfirmationEmail(req.user, newAppointment);
+
       const confirmationMessage = { role: 'assistant', content: `Appointment confirmed: "${newAppointment.title}" on ${newAppointment.date.toLocaleString()}.` };
-      await Chat.create(confirmationMessage);
+      await Chat.create({ userId: req.user._id, ...confirmationMessage });
       return res.json({ response: confirmationMessage });
 
     } else {
-  const systemPrompt = `You are "Luna", a helpful AI health assistant. Be friendly and conversational. Do not mention appointments unless the user does.`;
+      const systemPrompt = `You are "Aura", a helpful and personalized AI health assistant. Be friendly and conversational. Use the user's health profile to tailor your responses.
+      ---
+      USER'S HEALTH PROFILE:
+      - Name: ${req.user.name}
+      - Blood Type: ${req.user.bloodType || 'Not provided'}
+      - Known Allergies: ${req.user.allergies || 'Not provided'}
+      - Ongoing Health Conditions: ${req.user.healthConditions || 'Not provided'}
+      - Health Goals: ${req.user.healthGoals || 'Not provided'}
+      ---`;
+
       const history = messages.map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
       const result = await ai.models.generateContent({ model: "gemini-2.5-flash", systemInstruction: systemPrompt, contents: history });
       const assistantResponse = { role: 'assistant', content: result.text };
-      await Chat.create(assistantResponse);
+      await Chat.create({ userId: req.user._id, ...assistantResponse });
       res.json({ response: assistantResponse });
     }
   } catch (error) {

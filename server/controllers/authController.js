@@ -1,7 +1,6 @@
-// server/controllers/authController.js
-
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { sendWelcomeEmail } = require('../utils/emailUtils');
 
 // Utility to generate a JWT
 const generateToken = (id) => {
@@ -10,8 +9,10 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register a new user
-// @route   POST /api/v1/auth/register
+/**
+ * @desc    Register a new user
+ * @route   POST /api/v1/auth/register
+ */
 exports.registerUser = async (req, res) => {
   const { name, email, password, bloodType, allergies, healthConditions, healthGoals } = req.body;
   try {
@@ -22,7 +23,11 @@ exports.registerUser = async (req, res) => {
     const user = await User.create({
       name, email, password, bloodType, allergies, healthConditions, healthGoals
     });
+
     if (user) {
+      // Send the personalized welcome email (don't wait for it to complete)
+      sendWelcomeEmail(user);
+
       res.status(201).json({
         _id: user._id,
         name: user.name,
@@ -37,8 +42,10 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// @desc    Auth user & get token
-// @route   POST /api/v1/auth/login
+/**
+ * @desc    Auth user & get token
+ * @route   POST /api/v1/auth/login
+ */
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
   try {
