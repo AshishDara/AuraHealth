@@ -2,27 +2,22 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, IconButton, Badge } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 
-const AppHeader = ({ appointments, onNotificationClick }) => {
-  const getUpcomingAppointmentsCount = () => {
-    const now = new Date();
-    const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
-    return appointments.filter(app => {
-      const appDate = new Date(app.date);
-      return app.status === 'Confirmed' && appDate > now && appDate <= twoDaysFromNow;
-    }).length;
-  };
-
-  const upcomingCount = getUpcomingAppointmentsCount();
+const AppHeader = ({ appointments = [], onNotificationClick }) => {
+  const appointmentCount = appointments.length;
 
   return (
-    <AppBar position="fixed" elevation={1}>
+    <AppBar position="fixed">
       <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Aura Health
         </Typography>
-        <IconButton color="inherit" onClick={onNotificationClick}>
-          <Badge badgeContent={upcomingCount} color="error">
+        <IconButton
+          size="large"
+          aria-label="show new notifications"
+          color="inherit"
+          onClick={onNotificationClick}
+        >
+          <Badge badgeContent={appointmentCount} color="error">
             <NotificationsIcon />
           </Badge>
         </IconButton>

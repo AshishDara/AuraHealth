@@ -1,5 +1,5 @@
 const { GoogleGenAI } = require("@google/genai");
-const pdf = require('pdf-parse'); // This now works with the older version
+const pdf = require('pdf-parse');
 const Chat = require('../models/Chat');
 
 const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
@@ -11,11 +11,8 @@ exports.analyzeReport = async (req, res) => {
 
   try {
     const { message } = req.body;
-    
-    // Simple and direct parsing method
     const data = await pdf(req.file.buffer);
     const reportText = data.text;
-    
     const userQuestion = message || `Analyze: ${req.file.originalname}`;
 
     await Chat.create({
@@ -36,18 +33,15 @@ exports.analyzeReport = async (req, res) => {
     
     const result = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: [{ role: 'user', parts: [{text: prompt}] }]
+        contents: [{ role: 'user', parts: [{text: prompt}] }],
+        config: {
+          thinkingConfig: { thinkingBudget: 0 }, // Disables "thinking"
+        }
     });
 
     const text = result.text;
-
-    const aiResponse = {
-      role: 'assistant',
-      content: text,
-    };
-    
+    const aiResponse = { role: 'assistant', content: text };
     await Chat.create(aiResponse);
-    
     res.json({ response: aiResponse });
   } catch (error) {
     console.error('Error analyzing report with Gemini:', error);

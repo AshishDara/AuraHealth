@@ -4,35 +4,50 @@ const Chat = require('../models/Chat');
 
 const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
-const tools = [
-  {
-    functionDeclarations: [
-      {
-        name: 'book_appointment',
-        description: 'Books a health or medical appointment for the user. Requires a title (reason) and a date.',
-        parameters: {
-          type: 'OBJECT',
-          properties: {
-            title: { type: 'STRING', description: 'The title or reason for the appointment, e.g., "Dental Checkup".' },
-            date: { type: 'STRING', description: 'The date and time of the appointment in ISO 8601 format.' },
-          },
-          required: ['title', 'date'],
-        },
-      },
-      {
-        name: 'cancel_appointment',
-        description: 'Deletes or cancels an existing appointment for the user based on its title or date.',
-        parameters: {
-          type: 'OBJECT',
-          properties: {
-            title: { type: 'STRING', description: 'The title of the appointment to cancel, e.g., "Dental Checkup".' },
-            date: { type: 'STRING', description: 'The date of the appointment to cancel, in ISO 8601 format.' },
-          },
-        },
-      },
-    ],
-  },
-];
+// Helper function with robust JSON extraction
+async function extractAppointmentDetails(userMessage) {
+  const prompt = `You are a data extraction specialist. Analyze the user's request and provide a JSON object with two keys: "title" and "date". The current date is ${new Date().toISOString()}.
+  - The "title" should be a clean, short summary of the appointment's purpose.
+  - The "date" must be a precise date in ISO 8601 format.
+  
+  User Request: "${userMessage}"`;
+
+  try {
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
+    });
+    
+    // --- THIS IS THE KEY FIX: Robustly find and extract the JSON object ---
+    const rawText = result.text;
+    const jsonMatch = rawText.match(/{[\s\S]*}/); // Find the first occurrence of {...}
+
+    if (!jsonMatch) {
+      console.error("No JSON object found in the AI's response.");
+      return null;
+    }
+
+    return JSON.parse(jsonMatch[0]); // Parse only the extracted JSON part
+
+  } catch (error) {
+    console.error("Could not extract appointment details:", error);
+    return null;
+  }
+}
+
+// Helper function to find which appointment to cancel
+async function findAppointmentTitleToCancel(history) {
+  const prompt = `Based on the conversation history, identify the title of the specific appointment the user wants to cancel. Look for phrases like "Appointment confirmed:" to find the title. Return only the exact title and nothing else.\n\nHistory:\n${history.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+  try {
+    const result = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+    return result.text.trim().replace(/Appointment confirmed:|"/g, '').trim();
+  } catch (error) {
+    return null;
+  }
+}
 
 exports.getChatHistory = async (req, res) => {
   try {
@@ -46,87 +61,61 @@ exports.getChatHistory = async (req, res) => {
 exports.handleChat = async (req, res) => {
   const { messages } = req.body;
   const userMessage = messages[messages.length - 1];
-  
-  await Chat.create({ 
-    role: 'user', 
-    content: userMessage.content,
-    fileName: userMessage.fileName || null,
-  });
-
-  // --- IMPROVEMENT 1: More forceful instructions for the AI ---
-  const systemPrompt = `You are "Aura", a personal AI health assistant.
-    - Your primary function is to use tools. You MUST use the tools provided when the user's intent matches.
-    - If a user mentions booking, creating, or setting an appointment and provides a reason and a date, you MUST call the 'book_appointment' tool immediately. DO NOT ask for confirmation.
-    - If a user mentions deleting or canceling an appointment, you MUST call the 'cancel_appointment' tool.
-    - The current date is ${new Date().toISOString()}. Use this to calculate all future dates. The current year is ${new Date().getFullYear()}.
-    - Do not provide medical advice.`;
-
-  const history = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  await Chat.create({ role: 'user', content: userMessage.content, fileName: userMessage.fileName || null });
 
   try {
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      systemInstruction: systemPrompt,
-      contents: history,
-      tools: tools,
-    });
-    
-    // --- IMPROVEMENT 2: More robust response handling ---
-    const functionCalls = result.functionCalls;
+    const lowerCaseMessage = userMessage.content.toLowerCase();
+    const bookingKeywords = ['book', 'appointment', 'schedule', 'create', 'set up'];
+    const cancelKeywords = ['cancel', 'delete', 'remove'];
 
-    if (functionCalls && functionCalls.length > 0) {
-      const call = functionCalls[0];
-      const { name, args } = call;
+    const isCanceling = cancelKeywords.some(keyword => lowerCaseMessage.includes(keyword));
+    const isBooking = bookingKeywords.some(keyword => lowerCaseMessage.includes(keyword));
 
-      console.log('AI wants to call a tool:', name, args); // Debugging line
-
-      if (name === 'book_appointment') {
-        const newAppointment = await Appointment.create({
-          title: args.title,
-          date: new Date(args.date),
-        });
-        const confirmationMessage = {
-          role: 'assistant',
-          content: `Appointment confirmed! I've booked a "${newAppointment.title}" for you on ${new Date(newAppointment.date).toLocaleString()}.`,
-        };
-        await Chat.create(confirmationMessage);
-        return res.json({ response: confirmationMessage });
+    if (isCanceling) {
+      const titleToCancel = await findAppointmentTitleToCancel(messages);
+      if (!titleToCancel) {
+        const failedMessage = { role: 'assistant', content: "I'm sorry, I couldn't determine which appointment to cancel from our conversation." };
+        await Chat.create(failedMessage);
+        return res.json({ response: failedMessage });
       }
 
-      if (name === 'cancel_appointment') {
-        const query = {};
-        if (args.title) { query.title = { $regex: new RegExp(args.title, "i") }; }
-        if (args.date) {
-            const startOfDay = new Date(args.date); startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(args.date); endOfDay.setHours(23, 59, 59, 999);
-            query.date = { $gte: startOfDay, $lte: endOfDay };
-        }
-        const deletedAppointment = await Appointment.findOneAndDelete(query);
-        if (!deletedAppointment) {
-          const notFoundMessage = { role: 'assistant', content: "I couldn't find an active appointment that matches your request." };
-          await Chat.create(notFoundMessage);
-          return res.json({ response: notFoundMessage });
-        }
-        const confirmationMessage = {
-          role: 'assistant',
-          content: `OK. I've deleted your "${deletedAppointment.title}" appointment.`,
-        };
-        await Chat.create(confirmationMessage);
-        return res.json({ response: confirmationMessage });
+      const deletedAppointment = await Appointment.findOneAndDelete({ title: { $regex: new RegExp(titleToCancel, "i") } });
+      if (!deletedAppointment) {
+        const notFoundMessage = { role: 'assistant', content: `I couldn't find an appointment titled "${titleToCancel}".` };
+        await Chat.create(notFoundMessage);
+        return res.json({ response: notFoundMessage });
       }
+      const confirmationMessage = { role: 'assistant', content: `OK. I've canceled your "${deletedAppointment.title}" appointment.` };
+      await Chat.create(confirmationMessage);
+      return res.json({ response: confirmationMessage });
+
+    } else if (isBooking) {
+      const details = await extractAppointmentDetails(userMessage.content);
+      
+      if (!details || !details.title || !details.date) {
+        const failedMessage = { role: 'assistant', content: "I'm sorry, I couldn't understand the details of the appointment. Could you please provide a clear reason and date?" };
+        await Chat.create(failedMessage);
+        return res.json({ response: failedMessage });
+      }
+      
+      const newAppointment = await Appointment.create({
+        title: details.title,
+        date: new Date(details.date),
+      });
+      const confirmationMessage = { role: 'assistant', content: `Appointment confirmed: "${newAppointment.title}" on ${newAppointment.date.toLocaleString()}.` };
+      await Chat.create(confirmationMessage);
+      return res.json({ response: confirmationMessage });
+
+    } else {
+      const systemPrompt = `You are "Aura", a helpful AI health assistant. Be friendly and conversational. Do not mention appointments unless the user does.`;
+      const history = messages.map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
+      const result = await ai.models.generateContent({ model: "gemini-2.5-flash", systemInstruction: systemPrompt, contents: history });
+      const assistantResponse = { role: 'assistant', content: result.text };
+      await Chat.create(assistantResponse);
+      res.json({ response: assistantResponse });
     }
-    
-    // If no tool was called, send a regular text response
-    const textResponse = result.text;
-    const assistantResponse = { role: 'assistant', content: textResponse };
-    await Chat.create(assistantResponse);
-    res.json({ response: assistantResponse });
-
   } catch (error) {
-    console.error('Error with Gemini API:', error);
-    res.status(500).json({ error: 'Failed to get response from AI.' });
+    console.error('Error in handleChat:', error);
+    res.status(500).json({ error: 'An error occurred.' });
   }
 };

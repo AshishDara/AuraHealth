@@ -13,7 +13,7 @@ const appointmentSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['Confirmed', 'Cancelled', 'Completed'], // 'Completed' is added
+    enum: ['Confirmed', 'Cancelled', 'Completed'],
     default: 'Confirmed',
   },
 }, {
@@ -21,5 +21,4 @@ const appointmentSchema = new mongoose.Schema({
 });
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
-
 module.exports = Appointment;

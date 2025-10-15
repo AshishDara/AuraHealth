@@ -2,7 +2,7 @@ const Appointment = require('../models/Appointment');
 
 exports.getAppointments = async (req, res) => {
   try {
-    // This query now correctly filters for future, confirmed appointments
+    // This correctly finds appointments from now into the future
     const appointments = await Appointment.find({
       status: 'Confirmed',
       date: { $gte: new Date() } 
@@ -14,7 +14,6 @@ exports.getAppointments = async (req, res) => {
   }
 };
 
-// This function remains unchanged
 exports.updateAppointmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
