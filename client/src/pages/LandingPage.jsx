@@ -7,7 +7,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
 
   const handleEnterApp = () => {
-    navigate('/chat');
+    navigate('/register');
   };
 
   return (

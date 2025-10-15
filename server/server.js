@@ -22,7 +22,9 @@ app.use(express.json());
 const chatRoutes = require('./routes/chatRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const authRoutes = require('./routes/authRoutes');
 
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);

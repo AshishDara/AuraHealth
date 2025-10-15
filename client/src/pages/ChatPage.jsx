@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Paper, CircularProgress } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
 import ChatWindow from '../components/ChatWindow';
 import ChatInput from '../components/ChatInput';
 import VoiceModal from '../components/VoiceModal';
 import AppointmentsModal from '../components/AppointmentsModal';
-import axios from 'axios';
+import api from '../api/axiosConfig';
 import { speak } from '../utils/speechUtils';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
@@ -18,19 +19,19 @@ const ChatPage = () => {
   const [voiceStatus, setVoiceStatus] = useState('idle');
   const [isAppointmentsModalOpen, setIsAppointmentsModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [userName, setUserName] = useState(''); // State for user's name
+  const navigate = useNavigate();
 
   const { transcript, listening, resetTranscript } = useSpeechRecognition();
   const silenceTimer = useRef();
   const fileInputRef = useRef(null);
   const welcomeMessage = { role: 'assistant', content: 'Hello! I am Aura, your personal health assistant. How can I help you today?' };
 
-  // --- THIS IS THE KEY FIX ---
-  // This hook now only syncs the transcript to the input field WHILE you are actively speaking.
   useEffect(() => {
     if (listening) {
       setInputValue(transcript);
     }
-  }, [transcript, listening]); // 'listening' is now a crucial dependency.
+  }, [transcript, listening]);
 
   useEffect(() => {
     if (!listening) return;
@@ -47,7 +48,7 @@ const ChatPage = () => {
 
   const fetchAppointments = async () => {
     try {
-      const { data } = await axios.get('http://localhost:5001/api/v1/appointments');
+      const { data } = await api.get('/appointments');
       setAppointments(data);
     } catch (error) {
       console.error("Failed to fetch appointments:", error);
@@ -57,8 +58,14 @@ const ChatPage = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
+      
+      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      if (userInfo && userInfo.name) {
+        setUserName(userInfo.name);
+      }
+
       try {
-        const historyRes = await axios.get('http://localhost:5001/api/v1/chat');
+        const historyRes = await api.get('/chat');
         if (historyRes.data && historyRes.data.length > 0) {
           setMessages(historyRes.data.map(msg => ({ 
             role: msg.role, 
@@ -77,6 +84,12 @@ const ChatPage = () => {
     };
     fetchInitialData();
   }, []);
+  
+  const handleLogout = () => {
+    localStorage.removeItem('userInfo');
+    delete api.defaults.headers.common['Authorization'];
+    navigate('/login');
+  };
 
   const handleSendMessage = async (messageContent, file, options = { isVoiceInput: false }) => {
     const userMessageContent = messageContent || (file ? `Analyze this file` : '');
@@ -93,7 +106,7 @@ const ChatPage = () => {
     setMessages(prev => [...prev, userMessage]);
 
     setAttachedFile(null);
-    setInputValue(''); // This will now work correctly without being overridden
+    setInputValue('');
     resetTranscript();
     
     if (fileInputRef.current) {
@@ -109,13 +122,13 @@ const ChatPage = () => {
         const formData = new FormData();
         formData.append('report', file);
         formData.append('message', messageContent);
-        const response = await axios.post('http://localhost:5001/api/v1/reports/analyze', formData, {
+        const response = await api.post('/reports/analyze', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         data = response.data;
       } else {
         const updatedMessages = [...messages, userMessage];
-        const response = await axios.post('http://localhost:5001/api/v1/chat', { messages: updatedMessages });
+        const response = await api.post('/chat', { messages: updatedMessages });
         data = response.data;
       }
       
@@ -151,7 +164,7 @@ const ChatPage = () => {
   
   const handleCompleteAppointment = async (id) => {
     try {
-      await axios.patch(`http://localhost:5001/api/v1/appointments/${id}`, {
+      await api.patch(`/appointments/${id}`, {
         status: 'Completed',
       });
       fetchAppointments();
@@ -190,6 +203,8 @@ const ChatPage = () => {
       <AppHeader
         appointments={appointments}
         onNotificationClick={() => setIsAppointmentsModalOpen(true)}
+        userName={userName}
+        onLogout={handleLogout}
       />
       <Box component={Paper} sx={{
         flexGrow: 1,

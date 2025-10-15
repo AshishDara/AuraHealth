@@ -1,35 +1,43 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, IconButton, Badge } from '@mui/material';
+import { AppBar, Toolbar, Typography, IconButton, Badge, Button, Box } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 
-const AppHeader = ({ appointments = [], onNotificationClick }) => {
+// Add userName and onLogout to the props
+const AppHeader = ({ appointments = [], onNotificationClick, userName, onLogout }) => {
   const appointmentCount = appointments.length;
 
   return (
-    // --- Updated AppBar Style ---
     <AppBar 
       position="fixed" 
-      sx={{ 
-        bgcolor: 'background.paper', // White background
-        color: 'text.primary',      // Black text
-        borderBottom: '1px solid #e0e0e0' // Subtle border
-      }}
-      elevation={0} // Remove shadow for a flatter look
+      sx={{ bgcolor: 'background.paper', color: 'text.primary', borderBottom: '1px solid #e0e0e0' }}
+      elevation={0}
     >
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-          Luna Health
+          Aura Health
         </Typography>
-        <IconButton
-          size="large"
-          aria-label="show new notifications"
-          color="inherit" // Inherit black color
-          onClick={onNotificationClick}
-        >
-          <Badge badgeContent={appointmentCount} color="primary">
-            <NotificationsIcon />
-          </Badge>
-        </IconButton>
+        
+        {/* --- THIS IS THE NEW LOGIC --- */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {userName && (
+            <Typography sx={{ mr: 2 }}>
+              Welcome, {userName}
+            </Typography>
+          )}
+          <IconButton
+            size="large"
+            color="inherit"
+            onClick={onNotificationClick}
+          >
+            <Badge badgeContent={appointmentCount} color="primary">
+              <NotificationsIcon />
+            </Badge>
+          </IconButton>
+          {/* Add a logout button */}
+          <Button color="inherit" onClick={onLogout} sx={{ ml: 1 }}>
+            Logout
+          </Button>
+        </Box>
       </Toolbar>
     </AppBar>
   );
