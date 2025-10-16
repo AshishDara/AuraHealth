@@ -1,8 +1,9 @@
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 // Create a new instance of axios with a base URL
 const api = axios.create({
-  baseURL: 'http://localhost:5001/api/v1',
+  baseURL: `${API_URL}/api/v1`,
 });
 
 // Request Interceptor: Runs before every request is sent
